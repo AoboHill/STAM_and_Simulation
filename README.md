@@ -10,9 +10,11 @@ All of the STAM code is included in the STAM file folder.
 ```
 For the simulation:
 
-1. simulateSeq.R is to sample the sequences at tips using discrete WF
+1. simulateSeq.R is to sample the sequences at tips using discrete WF.
 
-2. Simulation_MOM.R is to assess the error of moment approximation approach (also use discrete WF)
+2. Simulation_MOM.R is to assess the error of moment approximation approach. 
+   The true distribution is sampled using discrete WF.
+   (This file may be out-of-date. If there is any problem with it, please tell me and I will modify it ASAP.)
 ```
 
 ## Scaling
@@ -32,6 +34,7 @@ sclaing:
 
 2. Q = (U - I)
 
-This scaling both used in STAM and corresponding simulations. Moreover, in the STAM, the mu in Q is fixed whereas the kappa is the only parameter required to be estimated
+This scaling both used in STAM and corresponding simulations. Moreover, in the STAM, 
+the mu in Q is fixed whereas the kappa is the only parameter required to be estimated
 
 ```
