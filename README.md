@@ -32,4 +32,6 @@ sclaing:
 
 2. Q = (U - I)
 
+This scaling both used in STAM and corresponding simulations. Moreover, in the STAM, the mu in Q is fixed whereas the kappa is the only parameter required to be estimated
+
 ```
