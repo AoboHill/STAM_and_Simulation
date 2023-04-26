@@ -34,6 +34,6 @@ sclaing:
 2. Q = N(U - I)
 
 This scaling both used in STAM and corresponding simulations. Moreover, in the STAM, 
-the mu in Q is fixed whereas the kappa is the only parameter required to be estimated
+the mu in Q (Kimura two-parameter model) is fixed whereas the kappa is the only parameter required to be estimated
 
 ```
