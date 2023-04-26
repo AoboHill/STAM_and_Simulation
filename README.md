@@ -14,7 +14,6 @@ For the simulation:
 
 2. Simulation_MOM.R is to assess the error of moment approximation approach. 
    The true distribution is sampled using discrete WF.
-   (This file may be out-of-date. If there is any problem with it, please tell me and I will modify it ASAP.)
 ```
 
 ## Scaling
