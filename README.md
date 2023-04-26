@@ -6,6 +6,7 @@
 All of the STAM code is included in the STAM file folder.
 ```
 
+## Simulation
 ```
 For the simulation:
 
@@ -13,6 +14,8 @@ For the simulation:
 
 2. Simulation_MOM.R is to assess the error of moment approximation approach (also use discrete WF)
 ```
+
+## Scaling
 
 ```
 About the scaling:
