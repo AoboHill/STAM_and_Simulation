@@ -8,17 +8,18 @@
 All of the STAM code is included in the STAM file folder.
 ```
 
+## STAM
+1. For running STAM to do the species tree inference, users are required to have BEAST2 version='2.6.7'
+2. Users may also be required to install the SNAPP (Bryant et al., 2012) and SNAPPER (Stolz et al., 2021).
+
 ## Simulation
 ```
 For the simulation:
 
 1. SimulateSeq.R is to sample the sequences at tips using discrete WF.
-
 2. Simulation_MOM.R is to assess the error of moment approximation approach. 
    The true distribution is sampled using discrete WF.
-
 3. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins
-
 4. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins using alternative formulas.
 
 Note that to run the simulation code may require load the functions by order.
