@@ -15,10 +15,11 @@ import java.util.List;
 import java.util.Random;
 
 
-@Description("Standard prior for STAM analysis, consisting of a Yule prior on the tree " +
-        "(parameterized by the birth rate lambda) " +
-        "and gamma distribution over the theta values (theta is the population size) " +
-        "(with parameters alpha and beta. Different from SNAPP and SNAPPER, here beta is the rate parameter). ")
+@Description("Standard prior for SnAP analysis, consisting of a Yule prior on the tree " +
+        "(parameterized by lambda) " +
+        "and gamma distribution over the theta values " +
+        "(with parameters alpha and beta). " +
+        "Thetas are represented by the coalescenceRate parameter where values are theta=2/coalescenceRate")
 public class STAMPrior extends Distribution {
     public Input<RealParameter> m_pAlpha = new Input<RealParameter>("alpha", "Alpha parameter for the gamma prior on population size (theta) values", Validate.REQUIRED);
     public Input<RealParameter> m_pBeta = new Input<RealParameter>("beta", "Beta parameter for the gamma prior on population size (theta) values", Validate.REQUIRED);
@@ -29,7 +30,6 @@ public class STAMPrior extends Distribution {
 
 
     enum Priors {
-        // Same option as SNAPPER but only gamma available now
         gamma,inverseGamma,CIR,uniform
     }
 
@@ -41,7 +41,7 @@ public class STAMPrior extends Distribution {
     @Override
     public void initAndValidate() {
         if (m_pKappa.get() == null) {
-            System.err.println("WARNING: kappa parameter not set for the prior. using default value of 1.0");
+            System.err.println("WARNING: kappa parameter not set for SnAPPrior. using default value of 1.0");
             m_pKappa.setValue(new RealParameter(new Double[]{1.0}), this);
         }
 
@@ -75,13 +75,13 @@ public class STAMPrior extends Distribution {
         int nspecies = (tree.getNodeCount() + 1) / 2;
         double lambda = m_pLambda.get().getValue();
 
-        double mu = 0.0; // default is pure birth process
+        double mu = 0.0; //Death process
 
         if (mu==0.0) {
             //Yule Model
             logP += (nspecies-1)*Math.log(lambda) - lambda*heightsum;
         } else {
-            //Birth death model.
+            //Birth death model.    See Thompson 1975, pg 56
             List<Double> allHeights = getSortedHeights(tree.getRoot());
             Iterator<Double> p = allHeights.iterator();
             double x1 = p.next();
@@ -102,18 +102,22 @@ public class STAMPrior extends Distribution {
         if (PRIORCHOICE == 0) {
             //Assume independent gamma distributions for thetas.
 
-            //
+            //We assume that 2/r has a gamma(alpha,beta) distribution. That means that r has density proportional to
+            // 1/(r^2)  * GAMMA(2/r|alpha,beta)
+            //which has log (alpha - 1.0)*Math.log(2.0/r) - (beta *(2.0/ r)) - 2*log(r), which in turn simplifies to the expr. below (w/ consts)
 
             for (int iNode = 0; iNode < theta.getDimension(); iNode++) {
                 double r = theta.getValue(iNode);
                 logP += (alpha-1) * Math.log(r) - r * beta;
             }
         } else if (PRIORCHOICE == 1) {
-            // Not available now
+
         } else if (PRIORCHOICE == 2) {
-            // Not available now
+
+
+
         } else {
-            // Not available now
+
         }
 
 
@@ -168,5 +172,5 @@ public class STAMPrior extends Distribution {
     @Override public List<String> getArguments() {return null;}
     @Override public List<String> getConditions() {return null;}
     @Override public void sample(State state, Random random) {};
-}
+} // class SSSPrior
 

@@ -1,6 +1,5 @@
 package STAM;
 
-import beast.core.Description;
 import beast.core.Input;
 import beast.core.Input.Validate;
 import beast.core.util.Log;
@@ -15,10 +14,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Description("Pre-process the alignment data to the allele frequency data (four-dimensional)")
 
 public class STAMData extends Alignment{
-    public Input<beast.evolution.alignment.Alignment> m_rawData = new Input<beast.evolution.alignment.Alignment>("rawdata","raw binary sequences");
+    public Input<Alignment> m_rawData = new Input<Alignment>("rawdata","raw binary sequences");
     public Input<List<TaxonSet>> m_taxonsets = new Input<List<TaxonSet>>("taxonset","set of taxons that group a number of SNP sequences into a single sequence",
             new ArrayList<TaxonSet>());
 
@@ -28,16 +26,13 @@ public class STAMData extends Alignment{
 
 
 
-
-    public Map<String, int[][]> countsData; // key: taxon, int[eachSite][counts for AGCT]
+    public Map<String, int[][]> countsData; // key: taxon, int[eachSite][counts for ACGT]
 
     List<String> taxonNames;
 
     int[][][] counts;
 
 
-    // The main data used for calculation
-    // [pattern][eachsite][counts for AGCT]
     int[][][] countsPatterns;
 
 
@@ -70,22 +65,21 @@ public class STAMData extends Alignment{
 
         // amalgamate binary sequences into count sequences by taxon sets
         if (m_taxonsets.get().size() > 0) {
-
-            // Get the raw data
             List<Sequence> sequences = m_rawData.get().sequenceInput.get();
 
             DataType rawDataType = m_rawData.get().getDataType();
-
             if (rawDataType instanceof Nucleotide) {
 
+                // call SNPs by setting first sequence to all zero
+                // any character in subsequent sequences that is not the same will be set to one
+
                 int numOfTaxon = m_rawData.get().getTaxonCount();
-
                 int alignmentLength = sequences.get(0).dataInput.get().length();
-
                 Map<String, int[][]> myData = new HashMap<>();
-                //new int[numOfTaxon][alignmentLength][4];
+                        //new int[numOfTaxon][alignmentLength][4];
                 //initialize the data
 
+                //int bbb = 1;
                 for(TaxonSet set : m_taxonsets.get()) {
                     myData.put(set.getID(),new int[alignmentLength][4]);
                     for (Taxon taxon : set.taxonsetInput.get()) {
@@ -94,8 +88,9 @@ public class STAMData extends Alignment{
                             if (sequences.get(i).taxonInput.get().equals(taxon.getID())) {
                                 char[] seqChar = sequences.get(i).dataInput.get().toCharArray();
                                 myData.put(set.getID(),countThisSeq(myData, set.getID(), seqChar));
-
-
+                                //myData.forEach((key, value) -> System.out.println(key + ":" + Arrays.toString(value[2])));
+                                //System.out.println(bbb);
+                                //bbb += 1;
                                 bFound = true;
                             }
 
@@ -150,13 +145,10 @@ public class STAMData extends Alignment{
             }
 
         }
-
         Log.info.println(toString(false));
 
     } // initAndValidate
 
-
-    // This is for counting the number of A,G,C,T in sequences
     public int[][] countThisSeq(Map<String, int[][]> myData,String taxonSetID, char[] seqChar){
         int index = 0;
         int[][] waitForUpdate = myData.get(taxonSetID);
@@ -196,10 +188,8 @@ public class STAMData extends Alignment{
                 String sMatch = matcher.group(1);
                 try {
                     if (map.containsKey(sMatch)) {
-
                         TaxonSet set = map.get(sMatch);
                         set.taxonsetInput.setValue(taxon, set);
-
                     } else {
                         TaxonSet set = new TaxonSet();
                         if (sMatch.equals(taxon.getID())) {
@@ -228,7 +218,6 @@ public class STAMData extends Alignment{
         return nIgnored;
     }
 
-    // Get the weights of the patterns
     public int getPatternWeight(int id) {
         if (id < patternWeight.length) {
             return patternWeight[id];
@@ -236,8 +225,6 @@ public class STAMData extends Alignment{
         return 0;
     }
 
-
-    // Get the counts pattern data, used in likelihood calculation
     public int[][][] getCountsPatterns(){
         return countsPatterns;
     }
@@ -346,8 +333,6 @@ public class STAMData extends Alignment{
         return patternWeight.length;
     }
 
-
-    // check if it is the unique pattern
     protected boolean isEqual ( int iSite1, int iSite2){
         for (String taxon: countsData.keySet()){
             //System.out.println(Arrays.toString(countsData.get(taxon)[iSite1]));

@@ -13,7 +13,7 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
     final static boolean debug = false;
 
     // 2 x #nodes x #patterns at bottom of branch
-    STAMPartialStorage[][][] mom;
+    STAMMomentApproximation[][][] mom;
     public double[][] time;
     int N;
 
@@ -24,6 +24,7 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
     double[] Q1;
     double[] Q2;
     double[] delta;
+    double theta;
 
 
 
@@ -35,26 +36,27 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
     int[][][][] stateMap_1;
 
 
-    public STAMTreeLikeLihoodCore(Node root, Alignment data, int N) {
-        this(root.getNodeCount(), data.getPatternCount(), N);
+    public STAMTreeLikeLihoodCore(Node root, Alignment data, int N, double theta) {
+        this(root.getNodeCount(), data.getPatternCount(), N,theta);
     }
 
-    public STAMTreeLikeLihoodCore(int nodeCount, int patternCount, int N) {
-        super(N * 6);
+    public STAMTreeLikeLihoodCore(int nodeCount, int patternCount, int N, double theta) {
+        super((N+1) * 6 + 4);
+        this.theta = theta;
         this.N = N;
-        mom = new STAMPartialStorage[2][nodeCount][patternCount];
+        mom = new STAMMomentApproximation[2][nodeCount][patternCount];
         for (int i = 0; i < nodeCount; i++) {
             for (int j = 0; j < patternCount; j++) {
-                mom[0][i][j] = new STAMPartialStorage(N);
-                mom[1][i][j] = new STAMPartialStorage(N);
+                mom[0][i][j] = new STAMMomentApproximation(N);
+                mom[1][i][j] = new STAMMomentApproximation(N);
             }
         }
-        v1 = new double[N * 6];
-        v1cache = new double[N * patternCount * 6];
-        v2 = new double[N * 6];
-        v2cache = new double[N * patternCount * 6];
-        Q1 = new double[N * N * 6 * 6];
-        Q2 = new double[N * N * 6 * 6];
+        v1 = new double[(N+1) * 6 + 4];
+        v1cache = new double[((N+1) * 6 + 4)* patternCount ];
+        v2 = new double[(N+1) * 6 + 4];
+        v2cache = new double[((N+1) * 6 + 4) * patternCount];
+        Q1 = new double[((N+1) * 6 + 4) * ((N+1) * 6 + 4)];
+        Q2 = new double[((N+1) * 6 + 4) * ((N+1) * 6 + 4)];
 
 
     }
@@ -69,11 +71,11 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
 
     public void updatePartial(double time, double[] matrix_, double[] a){
 
-        Array2d transitionMatrix = new Array2d(6 * N, 6 * N, matrix_);
+        Array2d transitionMatrix = new Array2d((N+1) * 6 + 4, (N+1) * 6 + 4, matrix_);
 
         double[] copy = transitionMatrix.mulrowVectorLeft(a);
 
-        System.arraycopy(copy, 0, a, 0, N * 6);
+        System.arraycopy(copy, 0, a, 0, (N+1) * 6 + 4);
 
     }
 
@@ -88,8 +90,8 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
 
 
     public double[][] to2DMatrix(double[] matrix){
-        double[][] it = new double[6*N][6*N];
-        for (int i = 0; i < 6 * N; i++){
+        double[][] it = new double[(N+1) * 6 + 4][(N+1) * 6 + 4];
+        for (int i = 0; i < (N+1) * 6 + 4; i++){
             System.arraycopy(matrix,0,it[i],0,it.length);
         }
 
@@ -101,7 +103,7 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
 
         for (int k = 0; k < nrOfPatterns; k++) {
             //System.out.println( "Info about input " + Arrays.toString(countsPatterns[k][nodeIndex]));
-            mom[currentPartialsIndex[nodeIndex]][nodeIndex][k].partialVector = getTipLikelihoods(countsPatterns[k][nodeIndex],N);
+            mom[currentPartialsIndex[nodeIndex]][nodeIndex][k].partialVector = getTipLikelihoods(countsPatterns[k][nodeIndex]);
             //System.out.println("info about output " + Arrays.toString(getTipLikelihoods(countsPatterns[k][nodeIndex], N)));
             //System.out.println(Arrays.toString(countsPatterns[k][nodeIndex]));
             //System.out.println(Arrays.toString(mom[currentPartialsIndex[nodeIndex]][nodeIndex][k].partialVector));
@@ -118,8 +120,8 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
                 mom[currentPartialsIndex[nodeIndex3]][nodeIndex3]);
     }
 
-    public void calculateParentsPartials(int nodeIndex1, STAMPartialStorage[] partials1, double[] matrices1,
-                                         int nodeIndex2, STAMPartialStorage[] partials2, double[] matrices2, STAMPartialStorage[] partials3
+    public void calculateParentsPartials(int nodeIndex1, STAMMomentApproximation[] partials1, double[] matrices1,
+                                         int nodeIndex2, STAMMomentApproximation[] partials2, double[] matrices2, STAMMomentApproximation[] partials3
     ){
 
         for (int l = 0; l < nrOfMatrices; l++) {
@@ -134,7 +136,7 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
                 System.arraycopy(partials2[k].partialVector, 0, v2, 0, N * 6);
                 updatePartial(time[nodeIndex2][l], Q2, v2);
 
-                for (int i = 0; i < N * 6; i++) {
+                for (int i = 0; i < (N+1) * 6 + 4; i++) {
                     partials3[k].partialVector[i] = Math.max(v1[i] * v2[i], 0);
                     //System.out.println(Arrays.toString(partials3[k].partialVector));
                     // f[i] = (v1[i] * v2[i]);
@@ -151,7 +153,7 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
     }
 
 
-    protected void calculateIntegratePartials(STAMPartialStorage[] inPartials, double[] proportions,
+    protected void calculateIntegratePartials(STAMMomentApproximation[] inPartials, double[] proportions,
                                               double[] outPartials) {
 
         int u = 0;
@@ -189,11 +191,11 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
             // System.out.println("here");
             // System.out.println(c.a[0]);
             double sum = 0;
-            for (int i = 1; i < 6*N; i += 1) {
+            for (int i = 1; i < (N+1) * 6 + 4; i += 1) {
                 // System.out.println(frequencies[i]);
                 // System.out.println(i);
                 // sum += Math.max(0, c.a[i] * frequencies[i]);
-                sum += partials[v] / (N * 6);
+                sum += partials[v] / ((N+1) * 6 + 4);
                 v ++;
             }
             //System.out.println("sum");
@@ -244,22 +246,81 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
 
 
 
-    public static double[][][] getTipBins(double nBins){
-        double[][][] tipBins = new double[6][(int) nBins][4];
+
+    public static double[][] getTipBins(double nBins, double[][] CL_Points){
+        double[][] tipBins = new double[(int) nBins][4];
         int[][] combinations = new int[][]{{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
         int[][] complementary = new int[][]{{2,3},{1,3},{1,2},{0,3},{0,2},{0,1}};
 
+        tipBins[0] = new double[]{1.0,0,0,0};
+        tipBins[1] = new double[]{0,1.0,0,0};
+        tipBins[2] = new double[]{0,0,1.0,0};
+        tipBins[3] = new double[]{0,0,0,1.0};
 
-        for (int i = 0; i < 6; i++){
-            for (int j = 0; j < nBins; j++){
-                tipBins[i][j][combinations[i][0]] = 1/nBins * (j) + 1/(2*nBins);
-                tipBins[i][j][combinations[i][1]] = 1 - 1/nBins * (j) - 1/(2*nBins);
-                tipBins[i][j][complementary[i][0]] = 0;
-                tipBins[i][j][complementary[i][1]] = 0;
+
+        int index = 0;
+
+
+        int i = 0;
+        for (int j = 4; j < nBins; j++){
+            tipBins[j][combinations[i][0]] = (CL_Points[index][0] + CL_Points[index][1])/2;
+            tipBins[j][combinations[i][1]] = 1 - (CL_Points[index][0] + CL_Points[index][1])/2;
+            tipBins[j][complementary[i][0]] = 0;
+            tipBins[j][complementary[i][1]] = 0;
+            index = index + 1;
+            if(index >= CL_Points.length){
+                index = 0;
             }
+            if ((j - 3) % CL_Points.length ==0){
+                i = i + 1;
+            }
+
         }
+
+
+
+
+
         return tipBins;
 
+    }
+
+    public static double[][] CL_bins(int nsize, double M) {
+        double[][] mymatrix = new double[nsize + 1][3];
+        double[] myc = new double[nsize];
+
+        for (int n = 0; n < nsize; n++) {
+            myc[n] = Math.cos((2.0 * (n + 1) - 1.0) * Math.PI / (2.0 * nsize));
+        }
+
+        double b = 1.0 - 1.0/M;
+        double a = 1.0/M;
+        for (int n = 0; n < nsize; n++) {
+            myc[n] = (b - a) / 2.0 * myc[n] + (a + b) / 2.0;
+        }
+
+        // Reverse the array myc
+        for (int i = 0; i < myc.length / 2; i++) {
+            double temp = myc[i];
+            myc[i] = myc[myc.length - 1 - i];
+            myc[myc.length - 1 - i] = temp;
+        }
+
+        double i = 1.0/M;
+        for (int n = 0; n < nsize; n++) {
+            mymatrix[n][0] = i;
+            mymatrix[n][1] = myc[n];
+            i = myc[n];
+        }
+
+        mymatrix[nsize][0] = i;
+        mymatrix[nsize][1] = 1.0 - 1.0/M;
+
+        for (int j = 0; j < mymatrix.length; j++) {
+            mymatrix[j][2] = mymatrix[j][1] - mymatrix[j][0];
+        }
+
+        return mymatrix;
     }
 
     /**
@@ -274,16 +335,16 @@ public class STAMTreeLikeLihoodCore extends BeerLikelihoodCore {
         return multinomialPdf(numNucleotide,aimBin);
     }
 
-    public double[] getTipLikelihoods(int[] numNucletide, int nBins){
-        double[][][] tipBins = getTipBins(N);
-        double[] tipLikelihoods = new double[6 * nBins];
+    public double[] getTipLikelihoods(int[] numNucletide){
+        double[][] tipBins = getTipBins((N+1) * 6 + 4,CL_bins(N,theta));
+        double[] tipLikelihoods = new double[(N+1) * 6 + 4];
         int index = 0;
-        for (double[][] eachCombination : tipBins){
-            for (double[] eachBin : eachCombination){
-                tipLikelihoods[index] = multinomialPdf(numNucletide, eachBin);
-                index += 1;
-            }
+        for (double[] eachBin : tipBins){
+            tipLikelihoods[index] = multinomialPdf(numNucletide, eachBin);
+            index += 1;
+
         }
+
         return tipLikelihoods;
 
     }

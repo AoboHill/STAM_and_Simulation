@@ -1,15 +1,11 @@
 package STAM;
 
-import beast.core.Description;
 import beast.core.Input;
 import beast.core.parameter.RealParameter;
 import beast.evolution.datatype.DataType;
 import beast.evolution.substitutionmodel.EigenDecomposition;
 import beast.evolution.substitutionmodel.SubstitutionModel;
 import beast.evolution.tree.Node;
-
-
-@Description("Provide substitution models but currently just for Kimura.")
 
 public class STAMSubstitutionModel extends SubstitutionModel.Base {
     public Input<RealParameter> m_k = new Input<RealParameter>("Kimura_k", "Instantaneous rate of mutating from the A to the C");
@@ -19,10 +15,7 @@ public class STAMSubstitutionModel extends SubstitutionModel.Base {
 
 
     public Input<RealParameter> thetaInput = new Input<RealParameter>("theta", "population size parameter with one value for each node in the tree");
-
-    // reserve the coalesentRateInput but not used
     public Input<RealParameter> coalesentRateInput = new Input<RealParameter>("coalescentRate", "coalescent rate parameter with one value for each node in the tree", Input.Validate.XOR, thetaInput);
-
 
     public STAMSubstitutionModel() {
         frequenciesInput.setRule(Input.Validate.OPTIONAL);

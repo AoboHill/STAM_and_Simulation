@@ -1,6 +1,5 @@
 package STAM;
 
-import beast.core.Description;
 import beast.core.Input;
 import beast.core.Input.Validate;
 import beast.core.State;
@@ -14,8 +13,6 @@ import beast.evolution.tree.Node;
 import beast.evolution.tree.Tree;
 import beast.evolution.tree.TreeInterface;
 import snap.NodeData;
-import snapper.SnapperTreeLikelihood;
-import STAM.STAMTreeLikeLihoodCore;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -25,16 +22,16 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
-@Description("Tree Likelihood Function for Single Site Nucleotide Sequences on a tree.")
+import static STAM.STAMTreeLikeLihoodCore.CL_bins;
+import static STAM.STAMTreeLikeLihoodCore.getTipBins;
+import static java.lang.Double.isNaN;
+
 
 public class STAMTreeLikelihood extends TreeLikelihood{
-    public Input<Integer> NInput = new Input<Integer>("N", "Number of bins", 10);
+    public Input<Integer> NInput = new Input<Integer>("N", "Number of bins", 20);
 
     public Input<Boolean> m_bInitFromTree = new Input<Boolean>("initFromTree", "whether to initialize coalescenceRate from starting tree values (if true), or vice versa (if false)", false);
     public Input<String> m_pPattern = new Input<String>("pattern", "pattern of metadata element associated with this parameter in the tree");
-
-
-    // Snapper paramter but not used in STAM
     public Input<Boolean> useLogLikelihoodCorrection = new Input<Boolean>("useLogLikelihoodCorrection", "use correction of log likelihood for the purpose of calculating " +
             "Bayes factors for different species assignments. There is (almost) no computational cost involved for the MCMC chain, but the log likelihood " +
             "might be reported as positive number with this correction since the likelihood is not a proper likelihood any more.", true);
@@ -54,6 +51,8 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 
     public Input<Integer> m_numUnfilteredSitesInput = new Input<Integer>("number of sites which were not filtered to remove constant sites",  "Number of sites not pre-filtered.  (default =0). This setting ignored unless non-polymorphic set to TRUE", 0);
 
+    public Input<Boolean> useBetaRootPriorInput = new Input<Boolean>("useBetaRootPrior", "instead of using a uniform prior for allele frequencies at the root, "
+            + "use a beta root prior", false);
 
     final private Input<List<TreeLikelihood>> likelihoodsInput = new Input<>("*","",new ArrayList<>());
 
@@ -65,7 +64,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
     /** shadow variable of m_pData input */
     protected Alignment m_data2;
 
-    protected STAMData m_stamdata;
+    protected STAMData m_aobodata;
 
     /** SampleSizes = #lineages per taxon **/
     int [] m_nSampleSizes;
@@ -98,7 +97,12 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 
     private ExecutorService pool = null;
     private final List<Callable<Double>> likelihoodCallers = new ArrayList<Callable<Double>>();
+    // specified a set ranges of patterns assigned to each thread
+    // first patternPoints contains 0, then one point for each thread
+    private int [] patternPoints;
+    static Boolean multithreaded = false;
 
+    double [] logPByThread;
 
     @Override
     public void initAndValidate() {
@@ -180,12 +184,21 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 
 
         m_data2 = dataInput.get();
+        m_aobodata = (STAM.STAMData) m_data2;
+        //m_aobodata = new AoboData();
+        //m_aobodata.m_rawData.setValue(m_data2,m_aobodata);
+        //m_aobodata.m_taxonsets.setValue(m_data2.taxonSetInput.get(),m_aobodata);
+        //m_aobodata.m_taxonsets.setValue(m_data2.sequenceInput.get(),m_aobodata);
+        //System.out.println(m_data2.taxonSetInput);
+        m_aobodata.initAndValidate();
 
-        // cast it to our own data type
-        m_stamdata = (STAM.STAMData) m_data2;
+        //System.out.println(Arrays.toString(m_aobodata.getCountsPatterns()[0][0]));
+        //System.out.println(Arrays.toString(m_aobodata.getCountsPatterns()[0][1]));
+        //System.out.println(Arrays.toString(m_aobodata.getCountsPatterns()[0][2]));
 
-
-        m_stamdata.initAndValidate();
+        //System.out.println(Arrays.toString(m_aobodata.getCountsPatterns()[0][0]));
+        //System.out.println(Arrays.toString(m_aobodata.getCountsPatterns()[1][0]));
+        //System.out.println(Arrays.toString(m_aobodata.getCountsPatterns()[2][0]));
 
 
 
@@ -204,9 +217,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
                     treeInput.get().getRoot().getClass().getName());
         }
 
-        // Get the number of pattern
-
-        int numPatterns = m_stamdata.getPatternCount();
+        int numPatterns = m_aobodata.getPatternCount();
         //System.out.println("numPatterns");
         //System.out.println(numPatterns);
 
@@ -222,7 +233,8 @@ public class STAMTreeLikelihood extends TreeLikelihood{
             throw new IllegalArgumentException("Only strict clock model allowed for branchRateModel, not " + branchRateModel.getClass().getName());
         }
 
-        m_core = new STAMTreeLikeLihoodCore(treeInput.get().getRoot().getNodeCount(), numPatterns,N);
+
+        m_core = new STAMTreeLikeLihoodCore(treeInput.get().getRoot().getNodeCount(), numPatterns,N, getThetas()[0]);
 
 
 
@@ -264,7 +276,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
         storedBranchLengths = new double[nodeCount];
 
         patternLogLikelihoods = new double[numPatterns];
-        m_fRootPartials = new double[numPatterns * N * 6];
+        m_fRootPartials = new double[numPatterns * ((N+1) * 6+4)];
 
         //System.out.println(m_siteModel.getCategoryCount());
         m_core.initialize(
@@ -276,9 +288,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 
         double [] f = new double[N];
 
-
-        // Get the pattern
-        int [][][] thisSite = m_stamdata.getCountsPatterns();
+        int [][][] thisSite = m_aobodata.getCountsPatterns();
 
 
 
@@ -318,22 +328,22 @@ public class STAMTreeLikelihood extends TreeLikelihood{
                     fCategoryRates[i] *= branchRate;
                 }
             }
-
+            //long startTime=System.nanoTime();
 
 
             traverse(root);
 
-
-
+            //long endTime=System.nanoTime();
+            //System.out.println("（Total）： "+(endTime-startTime)+"ns");
             // amalgamate site probabilities over patterns
-            int numPatterns = m_stamdata.getPatternCount();
+            int numPatterns = m_aobodata.getPatternCount();
             // claculate log prob
             logP = 0;
             // Site_L
             //System.out.println("PATTERNS");
             for(int id = 0; id < numPatterns - (m_bUsenNonPolymorphic ? 0 : 2); id++) {
                 //System.out.println("haha, you arrive here");
-                double freq = m_stamdata.getPatternWeight(id);
+                double freq = m_aobodata.getPatternWeight(id);
 
                 double siteL = patternLogLikelihoods[id];
 
@@ -359,7 +369,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
                             (double)ascSiteCount.getValue(1) * Math.log(m_fP1);
                     logP += ascLogP;
                 } else {
-                    logP -= (double) (m_stamdata.getSiteCount() - m_numUnfilteredSites) * Math.log(1.0 - m_fP0 - m_fP1); //Correct likelihoods for those sites which were pre-filtered (removing constant sites)
+                    logP -= (double) (m_aobodata.getSiteCount() - m_numUnfilteredSites) * Math.log(1.0 - m_fP0 - m_fP1); //Correct likelihoods for those sites which were pre-filtered (removing constant sites)
                 }
             }
 
@@ -376,7 +386,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 //	    			useCache,
 //	    			m_bUsenNonPolymorphic,
 //	    			dprint /*= false*/);
-            if(Double.isNaN(logP)){
+            if(isNaN(logP)){
                 System.out.println("NaN occur");
                 logP = -10e100;
                 //logP = 0;
@@ -465,7 +475,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 
 
     /* Assumes there IS a branch rate model as opposed to traverse() */
-    protected int traverse(final Node node) {
+    protected int traverse(final Node node){
 
 
 
@@ -481,11 +491,8 @@ public class STAMTreeLikelihood extends TreeLikelihood{
         //System.out.println(branchRate);
         final double branchTime = node.getLength();
         //System.out.println("The time "+ branchTime);
-
-
-        // This is for stationary distribution calculation
-        double[] freq = new double[N*6];
-        double[] freq1 = new double[N*6];
+        double[] freq = new double[((N+1) * 6+4)];
+        double[] freq1 = new double[((N+1) * 6+4)];
         // First update the transition probability matrix(ices) for this branch
         if (!node.isRoot() && (update != Tree.IS_CLEAN || branchTime != m_branchLengths[nodeIndex] ||
                 (m_substitutionmodel.thetaInput.get() != null && m_substitutionmodel.thetaInput.get().isDirty(nodeIndex)) ||
@@ -502,23 +509,25 @@ public class STAMTreeLikelihood extends TreeLikelihood{
             double[] waitingForScaled = buildQ1(k,u);
             //System.out.println("before theta" + Arrays.toString(waitingForScaled));
             //System.out.println(Arrays.toString(waitingForScaled));
-            double[][][] Bins = STAMTipLikelihood.getTipBins(N);
-            double scaledTheta = theta[nodeIndex] / fCategoryRates[0];
+            double[][] CL_bin = CL_bins(N,theta[nodeIndex]);
+            //System.out.println(Arrays.deepToString(CL_bin));
+            double[][] Bins = getTipBins((N+1)*6+4,CL_bin);
+            double scaledTheta = getThetas()[0];
             double[] rateMatrix = scaledBytehta(waitingForScaled,scaledTheta);
             time[0] =  branchTime;
             //System.out.println("rate matrix" + Arrays.toString(rateMatrix));
-            double[] it = rateToTransition(Bins,time[0],rateMatrix,N);
-            double[] stationary = rateToTransition(Bins,100000,rateMatrix,N);
-            System.arraycopy(stationary, 0, freq, 0, N * 6);
-            System.arraycopy(normalize(freq),0,freq1,0,N*6);
+            double[] it = rateToTransition(Bins,time[0],rateMatrix,N,theta[0],CL_bin);
+            double[] stationary = rateToTransition(Bins,999999999,rateMatrix,N,theta[0],CL_bin);
+            //System.out.println(Arrays.deepToString(Bins));
+            //System.out.println(Arrays.toString(rateMatrix));
+            //System.out.println(Arrays.toString(stationary));
+            System.arraycopy(stationary, 0, freq, 0, ((N+1) * 6+4));
+            System.arraycopy(normalize(freq),0,freq1,0,((N+1) * 6+4));
             //System.out.println("transition " + Arrays.toString(it));
-
-
-            // This part should be used to account for site heterogeneity but currently not used
             for (int i = 0; i < m_siteModel.getCategoryCount(); i++) {
                 //double scaledTheta = theta[nodeIndex] / fCategoryRates[i];
                 //final double jointBranchRate = m_siteModel.getRateForCategory(i, node) * branchRate;
-                //final double jointBranchRate = m_siteModel.getRateForCategory(i, node) ;
+                final double jointBranchRate = m_siteModel.getRateForCategory(i, node) ;
                 //System.out.println("jointbranchrate" + jointBranchRate);
                 //System.out.println("scale" + m_siteModel.getRateForCategory(i, node));
                 //time[i] =  branchTime/scaledTheta;// * scaledTheta / 2;
@@ -533,8 +542,8 @@ public class STAMTreeLikelihood extends TreeLikelihood{
 
                 //m_core.setNodeMatrix(nodeIndex, i, rateToTransition(Bins,time[i],rateMatrix,N));
                 m_core.setNodeMatrix(nodeIndex, i, it);
-                //long endTime=System.nanoTime(); //获取结束时间
-                //System.out.println("程序运行时间 （total）： "+(endTime-startTime)+"ns");
+                //long endTime=System.nanoTime();
+                //System.out.println("（total）： "+(endTime-startTime)+"ns");
 
 
             }
@@ -564,11 +573,11 @@ public class STAMTreeLikelihood extends TreeLikelihood{
                 }
 
                 if (m_siteModel.integrateAcrossCategories()) {
-                    //long startTime=System.nanoTime(); //获取结束时间
+                    //long startTime=System.nanoTime();
 
                     m_core.calculatePartials(childNum1, childNum2, nodeIndex);
-                    //long endTime=System.nanoTime(); //获取结束时间
-                    //System.out.println("程序运行时间 （along the branch）： "+(endTime-startTime)+"ns");
+                    //long endTime=System.nanoTime();
+                    //System.out.println(" （along the branch）： "+(endTime-startTime)+"ns");
                 } else {
                     throw new RuntimeException("Error TreeLikelihood 201: Site categories not supported");
                     //m_pLikelihoodCore->calculatePartials(childNum1, childNum2, nodeNum, siteCategories);
@@ -594,25 +603,111 @@ public class STAMTreeLikelihood extends TreeLikelihood{
         return update;
     } // traverse
 
-    public double[] rateToTransition(double[][][] Bins, double time, double[] matrix_, int N) {
+    public double[] rateToTransition(double[][] Bins, double time, double[] matrix_, int N,double theta,double[][]CL_points) {
 
-        double[] matrix = new double [N * 6 * N * 6];
+        double[] matrix = new double [(6*(N+1)+4) * (6*(N+1)+4)];
 
-        int index = 0;
-        for (double[][] starts : Bins){
-            for (double[] start : starts){
+
+
+
+            for (double[] start : Bins){
                 //long startTime=System.nanoTime();
-                STAMMomentApproximation mom_ = new STAMMomentApproximation(start,time,new Array2d(4,4,matrix_));
+                MomentApproximation mom_ = new MomentApproximation(start,time,new Array2d(4,4,matrix_));
                 mom_.Kimura();
-
-                double[] waitToBenormalized = new double[6 * N];
+                //long endTime=System.nanoTime();
+                //System.out.println(" （EV estimation）： "+(endTime-startTime)+"ns");
+                double[] waitToBenormalized = new double[(6*(N+1)+4)];
                 int count = 0;
                // long startTime1=System.nanoTime();
-                STAMProbability prob = new STAMProbability(mom_.Ext, mom_.Varxt,N);
+//                System.out.println(time);
+//                System.out.println(Arrays.toString(start));
+//                System.out.println(Arrays.toString(mom_.Ext));
+//                System.out.println(mom_.Varxt);
+                STAMProbability prob = new STAMProbability(mom_.Ext, mom_.Varxt,N,theta);
+                //long endTime1=System.nanoTime(); \n" +
+                //System.out.println("（parameter estimation）： "+(endTime1-startTime1)+"ns");
                 //long startTime2=System.nanoTime();
-                for (double[][] aims: Bins){
-                    for (double[] aim : aims){
 
+
+
+                    int index = 0;
+
+                    for (double[] aim : Bins){
+
+                        if (count > 3){
+                            double density = prob.HierarchBeta(aim,N);
+
+                            if (Double.isInfinite(density)){
+                                density = 0;
+                            }
+                            //System.out.println(density);
+                            //System.out.println("************");
+                            //if (Double.isNaN(density)){
+                            //    matrix[index] = 0;
+                            //} else{
+                            //matrix[index] = density;
+                            waitToBenormalized[count] = density * CL_points[index][2];
+                            if (isNaN(waitToBenormalized[count])){
+//                                System.out.println("density multiplied by bin size");
+//                                System.out.println(waitToBenormalized[count]);
+//                                System.out.println("time");
+//                                System.out.println(time);
+//                                System.out.println("------------");
+//                                System.out.println(mom_.Varxt);
+//                                System.out.println(Arrays.toString(mom_.Ext));
+//                                System.out.println("**************");
+//                                System.out.println(time);
+//                                System.out.println(prob.alphaAG);
+//                                System.out.println(prob.betaAG);
+//                                System.out.println(prob.alphaA);
+//                                System.out.println(prob.betaA);
+//                                System.out.println(prob.alphaC);
+//                                System.out.println(prob.betaC);
+//                                System.out.println("**************");
+                            }
+
+
+                            count++;
+
+                            //long endTime=System.nanoTime();
+                            //System.out.println("（calculate beta）： "+(endTime-startTime)+"ns");
+                            index ++;
+
+                            if (index >= N+1){
+                                index = 0;
+                            }
+                        } else {
+                            double spikeProbability = prob.HierarchBeta(aim,theta);
+//                            System.out.println("**************");
+//                            System.out.println(time);
+//                            System.out.println(prob.alphaAG);
+//                            System.out.println(prob.betaAG);
+//                            System.out.println(prob.alphaA);
+//                            System.out.println(prob.betaA);
+//                            System.out.println(prob.alphaC);
+//                            System.out.println(prob.betaC);
+//                            System.out.println("**************");
+//                            System.out.println(Arrays.toString(aim));
+//                            System.out.println(theta);
+
+
+                            if (Double.isInfinite(spikeProbability)){
+                                spikeProbability = 0;
+                            }
+                            //System.out.println(density);
+                            //System.out.println("************");
+                            //if (Double.isNaN(density)){
+                            //    matrix[index] = 0;
+                            //} else{
+                            //matrix[index] = density;
+                            waitToBenormalized[count] = spikeProbability;
+                            count++;
+                            //}
+                            //long endTime=System.nanoTime();
+                            //System.out.println("（calculate beta）： "+(endTime-startTime)+"ns");
+                        }
+
+                         //long startTime=System.nanoTime();
                         //System.out.println(Arrays.toString(mom_.Ext));
                         //System.out.println(mom_.Varxt);
                         //System.out.println("------------");
@@ -621,33 +716,20 @@ public class STAMTreeLikelihood extends TreeLikelihood{
                         //System.out.println(time);
                         //System.out.println(Arrays.toString(mom_.Ext));
                         //System.out.println(mom_.Varxt);
-                        double density = prob.HierarchBeta(aim,N);
-
-                        if (Double.isInfinite(density)){
-                            density = 0;
-                        }
-                        //System.out.println(density);
-                        //System.out.println("************");
-                        //if (Double.isNaN(density)){
-                        //    matrix[index] = 0;
-                        //} else{
-                        //matrix[index] = density;
-                        waitToBenormalized[count] = density;
-                        count++;
-                        //}
-                        //System.out.println("程序运行时间 （calculate beta）： "+(endTime-startTime)+"ns");
-                        index ++ ;
                     }
 
-                }
+
+                //long endTime2=System.nanoTime(); \n" +
+                //System.out.println(" （time of assigning）： "+(endTime2-startTime2)+"ns");
 
                 //System.out.println("before normalize:" + Arrays.toString(waitToBenormalized));
                 double[] afterNormalized = normalize(waitToBenormalized);
                 //System.out.println(Arrays.toString(afterNormalized));
-                System.arraycopy(afterNormalized,0,matrix,index-6*N,6*N);
+                //System.out.println(afterNormalized.length);
+                System.arraycopy(afterNormalized,0,matrix,count-(6*(N+1)+4),(6*(N+1)+4));
                 //System.out.println(Arrays.toString(matrix));
             }
-        }
+
 
         return matrix;
     }
@@ -655,7 +737,7 @@ public class STAMTreeLikelihood extends TreeLikelihood{
     double[] normalize(double[] vector){
         double sum = Arrays.stream(vector).sum();
         if (sum == 0){
-            return new double[6 * N];
+            return new double[(6 * (N+1))+4];
         }
         double[] v = new double[vector.length];
         for (int i = 0; i < vector.length; i++){
