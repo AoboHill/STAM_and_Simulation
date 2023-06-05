@@ -1,6 +1,8 @@
 # STAM_and_Simulation
 
-## This repository provides the simulation R code for the STAM algorithm.
+# Author: Aobo Wang from Australian National University
+
+## This repository provides the simulation R code for the STAM algorithm and the source JAVA code for STAM.
 
 ```
 All of the STAM code is included in the STAM file folder.
@@ -10,10 +12,16 @@ All of the STAM code is included in the STAM file folder.
 ```
 For the simulation:
 
-1. simulateSeq.R is to sample the sequences at tips using discrete WF.
+1. SimulateSeq.R is to sample the sequences at tips using discrete WF.
 
 2. Simulation_MOM.R is to assess the error of moment approximation approach. 
    The true distribution is sampled using discrete WF.
+
+3. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins
+
+4. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins using alternative formulas.
+
+Note that to run the simulation code may require load the functions by order.
 ```
 
 ## Scaling
