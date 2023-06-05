@@ -9,8 +9,10 @@ All of the STAM code is included in the STAM file folder.
 ```
 
 ## STAM
-1. For running STAM to do the species tree inference, users are required to have BEAST2 version='2.6.7'
+```
+1. For running STAM to do the species tree inference, users are required to have BEAST2 version='2.6.7'.
 2. Users may also be required to install the SNAPP (Bryant et al., 2012) and SNAPPER (Stolz et al., 2021).
+```
 
 ## Simulation
 ```
