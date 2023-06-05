@@ -1,6 +1,6 @@
 # STAM_and_Simulation
 
-# Author: Aobo Wang from Australian National University
+### Author: Aobo Wang from Australian National University
 
 ## This repository provides the simulation R code for the STAM algorithm and the source JAVA code for STAM.
 
