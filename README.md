@@ -22,7 +22,7 @@ For the simulation:
 2. Simulation_MOM.R is to assess the error of moment approximation approach. 
    The true distribution is sampled using discrete WF.
 3. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins
-4. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins using alternative formulas.
+4. Simulation_test_chebyshev_alternative is to asess the performance by grouping allele frequencies into bins using alternative formulas.
 
 Note that to run the simulation code may require load the functions by order.
 ```
