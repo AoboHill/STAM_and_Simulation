@@ -25,6 +25,8 @@ For the simulation:
 4. Simulation_test_chebyshev_alternative is to asess the performance by grouping allele frequencies into bins using alternative formulas.
 
 Note that to run the simulation code correctly may require load the functions by order.
+
+If you have any concerns or problems, please contace author Aobo Wang by email aobo.wang@anu.edu.au
 ```
 
 ## Scaling
