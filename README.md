@@ -24,7 +24,7 @@ For the simulation:
 3. Simulation_test_chebyshev is to asess the performance by grouping allele frequencies into bins
 4. Simulation_test_chebyshev_alternative is to asess the performance by grouping allele frequencies into bins using alternative formulas.
 
-Note that to run the simulation code may require load the functions by order.
+Note that to run the simulation code correctly may require load the functions by order.
 ```
 
 ## Scaling
